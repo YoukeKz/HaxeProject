@@ -137,9 +137,11 @@ class PlayState extends FlxState
 		m_bat.velocity.x = 0;
 		
 		if ( FlxG.keys.justPressed.SPACE ){
-			m_ballstat = 1;
-			m_ball.set_active( true );
-			m_ball.velocity.set( 0, 200 );
+			if( m_ballstat == 0 ){
+				m_ballstat = 1;
+				m_ball.set_active( true );
+				m_ball.velocity.set( 0, 200 );
+			}
 		}	
 		
 		// キー入力
@@ -188,8 +190,7 @@ class PlayState extends FlxState
 		var _diff 		: Int = 0;
 
 		if ( _ballmid == _batmid ){
-			var _ran : FlxRandom = new FlxRandom();
-			_ball.velocity.x = _ran.int( 0, 8 );
+			_ball.velocity.x = FlxG.random.int( 0, 8 );
 		}
 		else{
 			_diff = _ballmid - _batmid;
@@ -200,6 +201,7 @@ class PlayState extends FlxState
 	private function Callback_Bricks( _ball : FlxObject, _bricks : FlxObject )
 	{
 		_bricks.exists = false;
+		_bricks.kill;
 	}
 
 }
