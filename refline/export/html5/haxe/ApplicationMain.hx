@@ -38,6 +38,10 @@ class ApplicationMain {
 		types.push (lime.Assets.AssetType.TEXT);
 		
 		
+		urls.push ("assets/images/res.png");
+		types.push (lime.Assets.AssetType.IMAGE);
+		
+		
 		urls.push ("assets/music/music-goes-here.txt");
 		types.push (lime.Assets.AssetType.TEXT);
 		
@@ -127,7 +131,7 @@ class ApplicationMain {
 		
 		config = {
 			
-			build: "1",
+			build: "25",
 			company: "HaxeFlixel",
 			file: "refline",
 			fps: 60,

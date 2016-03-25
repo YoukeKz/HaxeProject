@@ -65,7 +65,7 @@ ApplicationMain.init = function() {
 	if(total == 0) ApplicationMain.start();
 };
 ApplicationMain.main = function() {
-	ApplicationMain.config = { build : "88", company : "HaxeFlixel", file : "TestProj", fps : 60, name : "TestProj", orientation : "", packageName : "com.example.myapp", version : "0.0.1", windows : [{ antialiasing : 0, background : 0, borderless : false, depthBuffer : false, display : 0, fullscreen : false, hardware : false, height : 480, parameters : "{}", resizable : false, stencilBuffer : true, title : "TestProj", vsync : true, width : 640, x : null, y : null}]};
+	ApplicationMain.config = { build : "89", company : "HaxeFlixel", file : "TestProj", fps : 60, name : "TestProj", orientation : "", packageName : "com.example.myapp", version : "0.0.1", windows : [{ antialiasing : 0, background : 0, borderless : false, depthBuffer : false, display : 0, fullscreen : false, hardware : false, height : 600, parameters : "{}", resizable : false, stencilBuffer : true, title : "TestProj", vsync : true, width : 800, x : null, y : null}]};
 };
 ApplicationMain.start = function() {
 	var hasMain = false;
@@ -1960,11 +1960,11 @@ NMEPreloader.prototype = $extend(openfl_display_Sprite.prototype,{
 		return 0;
 	}
 	,getHeight: function() {
-		var height = 480;
+		var height = 600;
 		if(height > 0) return height; else return openfl_Lib.current.stage.stageHeight;
 	}
 	,getWidth: function() {
-		var width = 640;
+		var width = 800;
 		if(width > 0) return width; else return openfl_Lib.current.stage.stageWidth;
 	}
 	,onInit: function() {
