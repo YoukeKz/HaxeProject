@@ -29,7 +29,7 @@ class Refline extends FlxSprite
 	public 	static var s_group		: FlxTypedGroup< Refline > = null;
 	
 	// private
-	private static var s_lengthMax		: Int 	= 3;
+	private static var s_lengthMax		: Int 	= 4;
 	private	static var s_isCreategroup 	: Bool 	= false;
 	private static var s_objCnt			: Int	= 0;
 	private static var s_fgDbgPrint		: Bool	= false;
@@ -46,8 +46,10 @@ class Refline extends FlxSprite
 	private var m_velocity	: Float;	// 速度
 	private var m_fgLenMax	: Bool;		// のびきったかどうか
 	private var m_fgHitWall	: Bool;		// 壁にぶつかったかどうか
+	public	var m_fgAlive	: Bool;		// 壁にぶつかったかどうか
 	private var m_refCnt	: Int;		// 跳ね返れる回数
 	private var m_Cnt		: Int;		// 跳ね返れる回数
+	private var m_tail		: Refline;	// 尻尾
 	
 	//*************************/
 	/* static public functions
@@ -72,6 +74,19 @@ class Refline extends FlxSprite
 	}
 	
 	/*!
+		@brief	グループを削除します。
+		@date	2016/3/29
+	*/
+	public static function DestroyGroup()
+	{
+		if ( s_group == null ){
+			return;
+		}
+		s_group = null;
+	}
+	
+	
+	/*!
 		@brief	グループのインスタンスを取得します。
 		@date	2016/3/18
 	*/
@@ -87,13 +102,13 @@ class Refline extends FlxSprite
 		@brief	グループにオブジェクトを追加します。
 		@date	2016/3/18
 	*/
-	public static function Add( _x : Float, _y : Float, _dir : E_DIR, _vel : Float = 4, _ref : Int = 10 )
+	public static function Add( _tail : Refline, _x : Float, _y : Float, _dir : E_DIR, _vel : Float = 4, _ref : Int = 10 )
 	{
 		if( s_group != null ){
 			var _obj : Refline = s_group.recycle();
-			s_group.add( _obj );
+//			s_group.add( _obj );
 			
-			_obj.init( Std.int( _x ), Std.int( _y ), _dir, _vel, _ref );
+			_obj.init( _tail, _x, _y, _dir, _vel, _ref );
 			
 			s_objCnt++;
 			s_fgDbgPrint = true;
@@ -104,7 +119,6 @@ class Refline extends FlxSprite
 	{
 		if( s_fgDbgPrint ){
 			s_fgDbgPrint = false;
-//			DebugUtil.Trace( "ObjectCnt : " + s_objCnt );
 		}
 	}
 	
@@ -134,13 +148,19 @@ class Refline extends FlxSprite
 		// まだ使わないのでキルしておく
 		kill();
 		FlxG.watch.add(this, "y", "refline.y");
+		FlxG.watch.add(this, "x", "refline.x");
+	}
+	
+	override public function destroy()
+	{
+		super.destroy();
 	}
 	
 	/*!
 		@brief	初期化
 		@date	2016/3/16
 	*/
-	public function init( _x : Int, _y : Int, _dir : E_DIR, _vel : Float = 4, _ref : Int = 10 )
+	public function init( _tail : Refline, _x : Float, _y : Float, _dir : E_DIR, _vel : Float = 4, _ref : Int = 10 )
 	{
 		m_pos.set( _x, _y );
 		m_head.set();
@@ -151,6 +171,8 @@ class Refline extends FlxSprite
 		m_fgLenMax	= false;
 		m_fgHitWall	= false;
 		m_refCnt	= _ref;
+		m_tail		= _tail;
+		m_fgAlive	= true;
 		
 		// 指定した向きによって、角度を設定する。
 		switch( m_dir ){
@@ -206,14 +228,19 @@ class Refline extends FlxSprite
 			m_addHead.set();
 		}
 		
+		
 		// ポジションの更新
 		setPosition( 	m_pos.x + m_head.x, 
 						m_pos.y + m_head.y );
 		
+		
+		if ( !m_fgHitWall ){
+//			trace( "x, y : ", x, y );
+		}
+		
 		// 画面外チェック
 		CheckOutOfCamera();				
 		// デバッグ出力
-//		DebugUtil.Trace( "( " + x + ", " + y + " )" );
 	} 
 	
 	//*************************/
@@ -225,9 +252,10 @@ class Refline extends FlxSprite
 	*/
 	private function CheckOutOfCamera()
 	{
-		if( x < -5 || x > FlxG.width ||
-			y < -5 || y > FlxG.height )
+		if( x < -5 || x > FlxG.width + 5 ||
+			y < -5 || y > FlxG.height + 5 )
 		{
+			m_fgAlive = false;
 			kill();
 		}	
 	}
@@ -263,24 +291,22 @@ class Refline extends FlxSprite
 
 			// 長さが最大のとき
 			if( m_fgLenMax ){
-				// 中心点ずらし
-				SetOrigin( GameCommon.ResSize, GameCommon.ResSize / 2 );
 				
 				// 頭の位置を指定してやる
 				var _head : Float = GameCommon.ResSize * s_lengthMax;
 				switch( m_dir ){
 					case UP:
-						m_addHead.set( 0, - ( m_head.y + _head ) );
-						m_addPos.set( 0, m_velocity + m_addHead.y );
+						m_addHead.set( 0, -( m_head.y + _head ) );
+						m_addPos.set( 0, -( m_velocity - m_addHead.y ) );
 					case DOWN:
 						m_addHead.set( 0, -( m_head.y - _head ) );
-						m_addPos.set( 0, m_velocity - m_addHead.y );
+						m_addPos.set( 0, ( m_velocity - m_addHead.y ) );
 					case LEFT:
 						m_addHead.set( -( m_head.x + _head ), 0 );
-						m_addPos.set( m_velocity + m_addHead.x, 0 );
+						m_addPos.set( -( m_velocity - m_addHead.x ), 0 );
 					case RIGHT:
 						m_addHead.set( -( m_head.x - _head ), 0 );
-						m_addPos.set( m_velocity - m_addHead.x, 0 );
+						m_addPos.set( ( m_velocity - m_addHead.x ), 0 );
 				}
 			}
 		}
@@ -293,7 +319,6 @@ class Refline extends FlxSprite
 				case RIGHT:	m_addPos.x += m_velocity;
 			}
 		}
-
 		
 		// 壁との接触チェック
 		CheckHitWall();
@@ -305,17 +330,25 @@ class Refline extends FlxSprite
 	*/
 	private function Update_AfterHitWall()
 	{
+		if( m_tail != null &&
+			m_tail.m_fgAlive ){
+			return;
+		}
+		
 		// スケールを小さくする
 		scale.x -= m_velocity / GameCommon.ResSize;
 		
 		// スケールが0以下になったら
+		if ( scale.x < m_velocity / GameCommon.ResSize ){
+			m_fgAlive = false;
+		}
 		if( scale.x < 0 ){
 			// スケールに補正を掛けて、0にする。
 			scale.x = 0;
 			s_objCnt--;
 			s_fgDbgPrint = true;
+			
 			kill();
-//			DebugUtil.Trace( x + ", " + y );
 		}
 	}
 	
@@ -328,49 +361,6 @@ class Refline extends FlxSprite
 		offset.set( _x, _y );
 	}
 	
-	/*! OldFunction
-		@brief	壁に接触したか
-		@date	2016/3/18
-	*//*
-	private function CheckHitWall_Old(){
-		if ( !m_fgHitWall ){
-			if( !m_fgLenMax ){
-				return;
-			}
-			else{
-				if ( x < GameCommon.ResSize ){
-					m_addPos.x = GameCommon.ResSize - x;
-					m_fgHitWall = true;
-				}
-				else if ( x > FlxG.width - GameCommon.ResSize ){
-					m_addPos.x = ( FlxG.width - GameCommon.ResSize ) - x;
-					m_fgHitWall = true;
-				}
-				else if ( y < GameCommon.ResSize ){
-					m_addPos.y = GameCommon.ResSize - y;
-					m_fgHitWall = true;
-				}
-				else if( y > FlxG.height - GameCommon.ResSize ){
-					m_addPos.y = ( FlxG.height - GameCommon.ResSize ) - y;
-					m_fgHitWall = true;
-				}
-			}
-			
-			// ここは一度しか通らない。
-			if ( m_fgHitWall && m_refCnt > 0 ){
-				var _rand = FlxG.random.int( 0, 2 );
-				var _table : Array< E_DIR >;
-				switch( m_dir ){
-					case UP:	_table = [ DOWN, 	LEFT, 	RIGHT ];
-					case DOWN:	_table = [ UP, 		LEFT, 	RIGHT ];
-					case LEFT:	_table = [ UP, 		DOWN, 	RIGHT ];
-					case RIGHT:	_table = [ UP, 		DOWN, 	LEFT ];
-				}
-				Add( x, y, _table[ _rand ], m_velocity * 0.9, m_refCnt - 1 );
-//				DebugUtil.Trace( "create!! " + x + ", " + y + ", " + _table[ _rand ] + ", " + m_velocity );
-			}
-		}
-	}*/
 
 	
 	/*************************************************************************************/
@@ -420,12 +410,20 @@ class Refline extends FlxSprite
 				if ( m_fgHitWall ){
 					// 跳ね返り回数が残っていたら、跳ね返る
 					if ( m_refCnt > 0 ){
-						Add( x + m_addPos.x + m_addHead.x, 
-							 y + m_addPos.y + m_addHead.y,
+						var _ofs : FlxPoint = new FlxPoint();
+						
+						// 方向制御
+						switch( m_nextDir ){
+							case UP:	_ofs.y = -0.1;
+							case DOWN:	_ofs.y = 0.1;
+							case LEFT:	_ofs.x = -0.1;
+							case RIGHT:	_ofs.x = 0.1;
+						}
+						
+						Add( this,
+							 x + m_addPos.x + m_addHead.x + _ofs.x,
+							 y + m_addPos.y + m_addHead.y + _ofs.y,
 							 m_nextDir, m_velocity, m_refCnt - 1 );
-					}
-					else{
-						trace( "LimitRefrect" );
 					}
 					break;
 				}
@@ -445,17 +443,18 @@ class Refline extends FlxSprite
 		// １フレ後に向かうポジション
 		_newPos = new FlxPoint( x + m_addPos.x + m_addHead.x,  y + m_addPos.y + m_addHead.y );
 		
-		// 当たっているかを調べる。_newPosには補正値が返ってくる。
+		_fgHitWall = CheckHitWall_Normal( _mapchip, _x, _y, _newPos );
+/*		// 当たっているかを調べる。_newPosには補正値が返ってくる。
 		switch( _mapchip ){
-			case GameCommon.MapChip_None:	/*何もしない*/
+			case GameCommon.MapChip_None:	// 何もしない
 			case GameCommon.MapChip_Normal:	_fgHitWall = CheckHitWall_Normal( _mapchip, _x, _y, _newPos );
 			case GameCommon.MapChip_LT:		_fgHitWall = CheckHitWall_LT( _mapchip, _x, _y, _newPos );
 			case GameCommon.MapChip_RT:		_fgHitWall = CheckHitWall_RT( _mapchip, _x, _y, _newPos );
 			case GameCommon.MapChip_LB:		_fgHitWall = CheckHitWall_LB( _mapchip, _x, _y, _newPos );
 			case GameCommon.MapChip_RB:		_fgHitWall = CheckHitWall_RB( _mapchip, _x, _y, _newPos );
-			default:						/*何もしない*/
+			default:						// 何もしない
 		}
-		
+*/		
 		// 移動値を変更する
 		if( _fgHitWall ){
 			if( m_fgLenMax )	m_addPos.addPoint( _newPos );
@@ -470,53 +469,11 @@ class Refline extends FlxSprite
 	*/
 	private function CheckHitWall_Normal( _mapchip : Int, _x : Int, _y : Int, _newPos : FlxPoint ) : Bool
 	{
-		var _brockSize 	: Float		= GameCommon.ResSize;
-		var _oldPos		: FlxPoint	= new FlxPoint( x, y );
-		var _brock		: FlxPoint 	= new FlxPoint( _x * _brockSize, _y * _brockSize );
-		
-		// 当たっているかどうか。
+		if( _mapchip <= GameCommon.MapChip_None ||
+			_mapchip >= GameCommon.MapChip_Max )
 		{
-			var _mapPosX	: Int = Std.int( _newPos.x / GameCommon.ResSize );
-			var _mapPosY	: Int = Std.int( _newPos.y / GameCommon.ResSize );
-			if( _mapPosX != _x || _mapPosY != _y ){
-				// 当たっていないので、処理をやめる
-				_newPos.set( 0, 0 );
-				return false;
-			}
+			return false;
 		}
-
-		// 補正値を算出
-		if( _oldPos.x < _brock.x ){
-			_newPos.set( _brock.x - _newPos.x - 0.1, 0 ); 
-		}
-		else if( _oldPos.x >= _brock.x + _brockSize ){
-			_newPos.set( _brock.x + _brockSize - _newPos.x + 0.1, 0 );
-		}
-		else if( _oldPos.y < _brock.y ){
-			_newPos.set( 0, _brock.y - _newPos.y - 0.1 );
-		}
-		else if( _oldPos.y >= _brock.y + _brockSize ){
-			_newPos.set( 0, _brock.y + _brockSize - _newPos.y + 0.1 );
-		}
-		
-		// 方向制御
-		switch( m_dir ){
-			case UP:	m_nextDir = DOWN;
-			case DOWN:	m_nextDir = UP;
-			case LEFT:	m_nextDir = RIGHT;
-			case RIGHT:	m_nextDir = LEFT;
-		}
-
-		return true;
-	}
-
-	/*!
-		@brief	左上が斜めの壁と当たった場合
-		@date	2016/3/24
-	*/
-	private function CheckHitWall_LT( _mapchip : Int, _x : Int, _y : Int, _newPos : FlxPoint ) : Bool
-	{
-//		return CheckHitWall_Irregular( _mapchip, _x, _y, _newPos );
 		
 		var _brockSize 	: Float		= GameCommon.ResSize;
 		var _oldPos		: FlxPoint	= new FlxPoint( x, y );
@@ -531,6 +488,7 @@ class Refline extends FlxSprite
 			var _mapPosOldX	: Int = Std.int( _newPos.x / GameCommon.ResSize );
 			var _mapPosOldY	: Int = Std.int( _newPos.y / GameCommon.ResSize );
 			
+			// 現在位置、未来位置がそのマスに属しているか。
 			if ( ( _mapPosOldX != _x || _mapPosOldY != _y ) && 
 				 ( _mapPosNewX != _x || _mapPosNewY != _y ) )
 			{
@@ -538,465 +496,145 @@ class Refline extends FlxSprite
 				_newPos.set( 0, 0 );
 				return false;
 			}
-			// 左上側の場合
-			else if( _oldPos.x < _brock.x + _brockSize &&
-					 _oldPos.y < _brock.y + _brockSize )
-			{
-				var _dif : FlxPoint = new FlxPoint( _newPos.x - _oldPos.x, _newPos.y - _oldPos.y );
-				// 移動の少ないほうを採用して、ブロックの場所を求める。
-				if( _dif.x * _dif.x < _dif.y * _dif.y ){
-					// ブロックの形状を変更
-					var _brockOfs : Float = _newPos.x - _brock.x;
-					_brockNew.set( _newPos.x, _brock.y + ( _brockSize - _brockOfs ) );
-				}
-				else{
-					// ブロックの形状を変更
-					var _brockOfs : Float = _newPos.y - _brock.y;
-					_brockNew.set( _brock.x + ( _brockSize - _brockOfs ), _newPos.y );
-				}
-				trace("Check0");
-				
-				// 変更後の状態で当たっているならば
-				if( _newPos.x >= _brockNew.x &&
-					_newPos.y >= _brockNew.y )
-				{
-					trace("Check2");
-					trace( "brock:" + _brock.x, _brock.y );
-					trace( "brockNew:" + _brockNew.x, _brockNew.y );
-					trace( "oldpos:" + _oldPos.x, _oldPos.y );
-					trace( "newpos:" + _newPos.x, _newPos.y );
-					// 特殊当たりフラグを立てる。　いらない？
-					_fgHitIrregular = true;
-				}
-				else{
-					trace("Check1");
-					trace( "brock:" + _brock.x, _brock.y );
-					trace( "brockNew:" + _brockNew.x, _brockNew.y );
-					trace( "oldpos:" + _oldPos.x, _oldPos.y );
-					trace( "newpos:" + _newPos.x, _newPos.y );
-					trace( " " );
-
-					// 当たっていなければ、処理をやめる
+			else if ( _mapchip != GameCommon.MapChip_Normal ){
+				if ( !CheckHitWall_Irregular( _mapchip, _oldPos, _newPos, _brock, _brockNew ) ){
 					_newPos.set( 0, 0 );
 					return false;
 				}
 			}
 		}
-		
+
 		// 補正値を算出
-		if ( _oldPos.x < _brockNew.x ){
-			// ブロックの左側が接触
-			_newPos.set( _brockNew.x - _newPos.x - 0.1, 0 ); 
-		}
-		else if( _oldPos.x > _brockNew.x + _brockSize ){
-			// ブロックの右側が接触
-			_newPos.set( _brockNew.x + _brockSize - _newPos.x + 0.1, 0 );
-		}
-		else if( _oldPos.y < _brockNew.y ){
-			// ブロックの上側が接触
-			_newPos.set( 0, _brockNew.y - _newPos.y - 0.1 );
-		}
-		else if( _oldPos.y > _brockNew.y + _brockSize ){
-			// ブロックの下側が接触
-			_newPos.set( 0, _brockNew.y + _brockSize - _newPos.y + 0.1 );
-		}
-
-		trace( "newNewpos:" + _newPos.x, _newPos.y );
-		trace( " " );
-
+		CheckHitWall_GetHosei( _oldPos, _newPos, _brockNew );
+		
 		// 方向制御
-		switch( m_dir ){
-			case UP:	m_nextDir = DOWN;
-			case DOWN:	m_nextDir = LEFT;
-			case LEFT:	m_nextDir = RIGHT;
-			case RIGHT:	m_nextDir = UP;
-		}
-		
-		return true;
-	}
-	
-	/*!
-		@brief	右上が斜めの壁と当たった場合
-		@date	2016/3/24
-	*/
-	private function CheckHitWall_RT( _mapchip : Int, _x : Int, _y : Int, _newPos : FlxPoint ) : Bool
-	{
-//		return CheckHitWall_Irregular( _mapchip, _x, _y, _newPos );
-		
-		var _brockSize 	: Float		= GameCommon.ResSize;
-		var _oldPos		: FlxPoint	= new FlxPoint( x, y );
-		var _brock		: FlxPoint 	= new FlxPoint( _x * _brockSize, _y * _brockSize );
-		var _brockNew	: FlxPoint 	= new FlxPoint( _brock.x, _brock.y );
-		var _fgHitIrregular : Bool	= false;
-		
-		// 当たっているかどうか。
-		{
-			var _mapPosNewX	: Int = Std.int( _oldPos.x / GameCommon.ResSize );
-			var _mapPosNewY	: Int = Std.int( _oldPos.y / GameCommon.ResSize );
-			var _mapPosOldX	: Int = Std.int( _newPos.x / GameCommon.ResSize );
-			var _mapPosOldY	: Int = Std.int( _newPos.y / GameCommon.ResSize );
-			
-			if ( ( _mapPosOldX != _x || _mapPosOldY != _y ) && 
-				 ( _mapPosNewX != _x || _mapPosNewY != _y ) )
-			{
-				// 当たっていないので、処理をやめる
-				_newPos.set( 0, 0 );
-				return false;
-			}
-			// 右上側の場合
-			else if( _oldPos.x >= _brock.x &&
-					 _oldPos.y < _brock.y + _brockSize )
-			{
-				var _dif : FlxPoint = new FlxPoint( _newPos.x - _oldPos.x, _newPos.y - _oldPos.y );
-				// 移動の少ないほうを採用して、ブロックの場所を求める。
-				if( _dif.x * _dif.x < _dif.y * _dif.y ){
-					// ブロックの形状を変更
-					var _brockOfs : Float = _newPos.x - _brock.x;
-					_brockNew.set( _newPos.x - _brockSize, _brock.y + _brockOfs );
-				}
-				else{
-					// ブロックの形状を変更
-					var _brockOfs : Float = _newPos.y - _brock.y;
-					_brockNew.set( _brock.x - ( _brockSize - _brockOfs ), _newPos.y );
-				}
-				trace("Check0");
-				
-				// 変更後の状態で当たっているならば
-				if( _newPos.x <= _brockNew.x + _brockSize &&
-					_newPos.y >= _brockNew.y )
-				{
-					trace("Check2");
-					trace( "brock:" + _brock.x, _brock.y );
-					trace( "brockNew:" + ( _brockNew.x + _brockSize ), _brockNew.y );
-					trace( "oldpos:" + _oldPos.x, _oldPos.y );
-					trace( "newpos:" + _newPos.x, _newPos.y );
-					// 特殊当たりフラグを立てる。　いらない？
-					_fgHitIrregular = true;
-				}
-				else{
-					trace("Check1");
-					trace( "brock:" + _brock.x, _brock.y );
-					trace( "brockNew:" + ( _brockNew.x + _brockSize ), _brockNew.y );
-					trace( "oldpos:" + _oldPos.x, _oldPos.y );
-					trace( "newpos:" + _newPos.x, _newPos.y );
-					trace( " " );
-
-					// 当たっていなければ、処理をやめる
-					_newPos.set( 0, 0 );
-					return false;
-				}
-			}
-		}
-		
-		// 補正値を算出
-		if ( _oldPos.x < _brockNew.x ){
-			trace( " Check003");
-			// ブロックの左側が接触
-			_newPos.set( _brockNew.x - _newPos.x - 0.1, 0 ); 
-		}
-		else if( _oldPos.x > _brockNew.x + _brockSize ){
-			trace( " Check004");
-			// ブロックの右側が接触
-			_newPos.set( _brockNew.x + _brockSize - _newPos.x + 0.1, 0 );
-		}
-		else if ( _oldPos.y < _brockNew.y ){
-			trace( " Check001");
-			// ブロックの上側が接触
-			_newPos.set( 0, _brockNew.y - _newPos.y - 0.1 );
-		}
-		else if( _oldPos.y > _brockNew.y + _brockSize ){
-			trace( " Check002");
-			// ブロックの下側が接触
-			_newPos.set( 0, _brockNew.y + _brockSize - _newPos.y + 0.1 );
-		}
-
-		trace( "newNewpos:" + _newPos.x, _newPos.y );
-		trace( " " );
-
-		// 方向制御
-		switch( m_dir ){
-			case UP:	m_nextDir = DOWN;
-			case DOWN:	m_nextDir = RIGHT;
-			case LEFT:	m_nextDir = UP;
-			case RIGHT:	m_nextDir = LEFT;
-		}
-		
-		return true;
-		
-	}
-
-	/*!
-		@brief	左下が斜めの壁と当たった場合
-		@date	2016/3/24
-	*/
-	private function CheckHitWall_LB( _mapchip : Int, _x : Int, _y : Int, _newPos : FlxPoint ) : Bool
-	{
-//		return CheckHitWall_Irregular( _mapchip, _x, _y, _newPos );
-		
-		var _brockSize 	: Float		= GameCommon.ResSize;
-		var _oldPos		: FlxPoint	= new FlxPoint( x, y );
-		var _brock		: FlxPoint 	= new FlxPoint( _x * _brockSize, _y * _brockSize );
-		var _brockNew	: FlxPoint 	= new FlxPoint( _brock.x, _brock.y );
-		var _fgHitIrregular : Bool	= false;
-		
-		// 当たっているかどうか。
-		{
-			var _mapPosNewX	: Int = Std.int( _oldPos.x / GameCommon.ResSize );
-			var _mapPosNewY	: Int = Std.int( _oldPos.y / GameCommon.ResSize );
-			var _mapPosOldX	: Int = Std.int( _newPos.x / GameCommon.ResSize );
-			var _mapPosOldY	: Int = Std.int( _newPos.y / GameCommon.ResSize );
-			
-			if ( ( _mapPosOldX != _x || _mapPosOldY != _y ) && 
-				 ( _mapPosNewX != _x || _mapPosNewY != _y ) )
-			{
-				// 当たっていないので、処理をやめる
-				_newPos.set( 0, 0 );
-				return false;
-			}
-			// 左下側の場合
-			else if( _oldPos.x <= _brock.x + _brockSize &&
-					 _oldPos.y > _brock.y )
-			{
-				var _dif : FlxPoint = new FlxPoint( _newPos.x - _oldPos.x, _newPos.y - _oldPos.y );
-				// 移動の少ないほうを採用して、ブロックの場所を求める。
-				if( _dif.x * _dif.x < _dif.y * _dif.y ){
-					// ブロックの形状を変更
-					var _brockOfs : Float = _newPos.x - _brock.x;
-					_brockNew.set( _newPos.x - _brockSize, _brock.y - ( _brockSize - _brockOfs ) );
-				}
-				else{
-					// ブロックの形状を変更
-					var _brockOfs : Float = _newPos.y - _brock.y;
-					_brockNew.set( _brock.x + _brockOfs, _newPos.y );
-				}
-				trace("Check0");
-				
-				// 変更後の状態で当たっているならば
-				if( _newPos.x >= _brockNew.x &&
-					_newPos.y <= _brockNew.y + _brockSize )
-				{
-					trace("Check2");
-					trace( "brock:" + _brock.x, _brock.y );
-					trace( "brockNew:" + ( _brockNew.x + _brockSize ), _brockNew.y );
-					trace( "oldpos:" + _oldPos.x, _oldPos.y );
-					trace( "newpos:" + _newPos.x, _newPos.y );
-					// 特殊当たりフラグを立てる。　いらない？
-					_fgHitIrregular = true;
-				}
-				else{
-					trace("Check1");
-					trace( "brock:" + _brock.x, _brock.y );
-					trace( "brockNew:" + ( _brockNew.x + _brockSize ), _brockNew.y );
-					trace( "oldpos:" + _oldPos.x, _oldPos.y );
-					trace( "newpos:" + _newPos.x, _newPos.y );
-					trace( " " );
-
-					// 当たっていなければ、処理をやめる
-					_newPos.set( 0, 0 );
-					return false;
-				}
-			}
-		}
-		
-		// 補正値を算出
-		if ( _oldPos.x < _brockNew.x ){
-			// ブロックの左側が接触
-			_newPos.set( _brockNew.x - _newPos.x - 0.1, 0 ); 
-		}
-		else if( _oldPos.x > _brockNew.x + _brockSize ){
-			// ブロックの右側が接触
-			_newPos.set( _brockNew.x + _brockSize - _newPos.x + 0.1, 0 );
-		}
-		else if( _oldPos.y >= _brockNew.y + _brockSize ){
-			// ブロックの下側が接触
-			_newPos.set( 0, _brockNew.y + _brockSize - _newPos.y + 0.1 );
-		}
-		else if( _oldPos.y < _brockNew.y ){
-			// ブロックの上側が接触
-			_newPos.set( 0, _brockNew.y - _newPos.y - 0.1 );
-		}
-
-		trace( "newNewpos:" + _newPos.x, _newPos.y );
-		trace( " " );
-
-		// 方向制御
-		switch( m_dir ){
-			case UP:	m_nextDir = LEFT;
-			case DOWN:	m_nextDir = UP;
-			case LEFT:	m_nextDir = RIGHT;
-			case RIGHT:	m_nextDir = DOWN;
-		}
+		CheckHitWall_SetNextDir( _mapchip );
 		
 		return true;
 	}
 
-	/*!
-		@brief	右下が斜めの壁と当たった場合
-		@date	2016/3/24
-	*/
-	private function CheckHitWall_RB( _mapchip : Int, _x : Int, _y : Int, _newPos : FlxPoint ) : Bool
+	private function CheckHitWall_GetHosei( _oldPos : FlxPoint, _newPos : FlxPoint, _brockNew : FlxPoint ) 
 	{
-//		return CheckHitWall_Irregular( _mapchip, _x, _y, _newPos );
-		
 		var _brockSize 	: Float		= GameCommon.ResSize;
-		var _oldPos		: FlxPoint	= new FlxPoint( x, y );
-		var _brock		: FlxPoint 	= new FlxPoint( _x * _brockSize, _y * _brockSize );
-		var _brockNew	: FlxPoint 	= new FlxPoint( _brock.x, _brock.y );
-		var _fgHitIrregular : Bool	= false;
-		
-		// 当たっているかどうか。
-		{
-			var _mapPosNewX	: Int = Std.int( _oldPos.x / GameCommon.ResSize );
-			var _mapPosNewY	: Int = Std.int( _oldPos.y / GameCommon.ResSize );
-			var _mapPosOldX	: Int = Std.int( _newPos.x / GameCommon.ResSize );
-			var _mapPosOldY	: Int = Std.int( _newPos.y / GameCommon.ResSize );
-			
-			if ( ( _mapPosOldX != _x || _mapPosOldY != _y ) && 
-				 ( _mapPosNewX != _x || _mapPosNewY != _y ) )
-			{
-				// 当たっていないので、処理をやめる
-				_newPos.set( 0, 0 );
-				return false;
-			}
-			// 右下側の場合
-			else if( _oldPos.x > _brock.x &&
-					 _oldPos.y > _brock.y )
-			{
-				var _dif : FlxPoint = new FlxPoint( _newPos.x - _oldPos.x, _newPos.y - _oldPos.y );
-				// 移動の少ないほうを採用して、ブロックの場所を求める。
-				if( _dif.x * _dif.x < _dif.y * _dif.y ){
-					// ブロックの形状を変更
-					var _brockOfs : Float = _newPos.x - _brock.x;
-					_brockNew.set( _newPos.x - _brockSize, _brock.y - _brockOfs );
-				}
-				else{
-					// ブロックの形状を変更
-					var _brockOfs : Float = _newPos.y - _brock.y;
-					_brockNew.set( _brock.x - _brockOfs, _newPos.y - _brockSize );
-				}
-				trace("Check0");
-				
-				// 変更後の状態で当たっているならば
-				if( _newPos.x <= _brockNew.x + _brockSize &&
-					_newPos.y <= _brockNew.y + _brockSize )
-				{
-					trace("Check2");
-					trace( "brock:" + _brock.x, _brock.y );
-					trace( "brockNew:" + ( _brockNew.x + _brockSize ), _brockNew.y );
-					trace( "oldpos:" + _oldPos.x, _oldPos.y );
-					trace( "newpos:" + _newPos.x, _newPos.y );
-					// 特殊当たりフラグを立てる。　いらない？
-					_fgHitIrregular = true;
-				}
-				else{
-					trace("Check1");
-					trace( "brock:" + _brock.x, _brock.y );
-					trace( "brockNew:" + ( _brockNew.x + _brockSize ), _brockNew.y );
-					trace( "oldpos:" + _oldPos.x, _oldPos.y );
-					trace( "newpos:" + _newPos.x, _newPos.y );
-					trace( " " );
-
-					// 当たっていなければ、処理をやめる
-					_newPos.set( 0, 0 );
-					return false;
-				}
-			}
-		}
 		
 		// 補正値を算出
 		if ( _oldPos.x < _brockNew.x ){
 			// ブロックの左側が接触
-			_newPos.set( _brockNew.x - _newPos.x - 0.1, 0 ); 
-		}
-		else if( _oldPos.x > _brockNew.x + _brockSize ){
-			// ブロックの右側が接触
-			_newPos.set( _brockNew.x + _brockSize - _newPos.x + 0.1, 0 );
-		}
-		else if( _oldPos.y < _brockNew.y ){
-			// ブロックの上側が接触
-			_newPos.set( 0, _brockNew.y - _newPos.y - 0.1 );
-		}
-		else if( _oldPos.y > _brockNew.y + _brockSize ){
-			// ブロックの下側が接触
-			_newPos.set( 0, _brockNew.y + _brockSize - _newPos.y + 0.1 );
-		}
-
-		trace( "newNewpos:" + _newPos.x, _newPos.y );
-		trace( " " );
-
-		// 方向制御
-		switch( m_dir ){
-			case UP:	m_nextDir = RIGHT;
-			case DOWN:	m_nextDir = UP;
-			case LEFT:	m_nextDir = DOWN;
-			case RIGHT:	m_nextDir = LEFT;
-		}
-		
-		return true;
-		
-	}
-
-	private function CheckHitWall_Irregular( _mapchip : Int, _x : Int, _y : Int, _newPos : FlxPoint ) : Bool
-	{
-		var _brockSize 	: Float		= GameCommon.ResSize;
-		var _oldPos		: FlxPoint	= new FlxPoint( x, y );
-		var _brock		: FlxPoint 	= new FlxPoint( _x * _brockSize, _y * _brockSize );
-		var _brockNew	: FlxPoint 	= new FlxPoint( _brock.x, _brock.y );
-		var _fgHitIrregular : Bool	= false;
-		
-		// 当たっているかどうか。
-		{
-			var _mapPosNewX	: Int = Std.int( _oldPos.x / GameCommon.ResSize );
-			var _mapPosNewY	: Int = Std.int( _oldPos.y / GameCommon.ResSize );
-			var _mapPosOldX	: Int = Std.int( _newPos.x / GameCommon.ResSize );
-			var _mapPosOldY	: Int = Std.int( _newPos.y / GameCommon.ResSize );
-			
-			if ( ( _mapPosOldX != _x || _mapPosOldY != _y ) && 
-				 ( _mapPosNewX != _x || _mapPosNewY != _y ) )
-			{
-				// 当たっていないので、処理をやめる
-				_newPos.set( 0, 0 );
-				return false;
-			}
-			else{
-				var _fgCheck : Bool = CheckHitWall_Irregular_Dir( _mapchip, _oldPos, _newPos, _brock, _brockNew );
-				if( !_fgCheck ){
-					return false;
-				}
-				trace( "Check9" );
-			}
-		}
-		
-		trace( "Check10" );
-		trace( "oldpos:" + _oldPos.x, _oldPos.y );
-		trace( "newpos:" + _newPos.x, _newPos.y );
-		trace( "brock:" + _brock.x, _brock.y );
-		trace( "brockNew:" + _brockNew.x, _brockNew.y );
-		
-		// 補正値を算出
-		if ( _oldPos.x < _brockNew.x ){
-			// ブロックの左側が接触
-			_newPos.set( _brockNew.x - _newPos.x - 0.1, 0 ); 
+			_newPos.set( _brockNew.x - _newPos.x, 0 ); 
 		}
 		else if( _oldPos.x >= _brockNew.x + _brockSize ){
 			// ブロックの右側が接触
-			_newPos.set( _brockNew.x + _brockSize - _newPos.x + 0.1, 0 );
+			_newPos.set( _brockNew.x + _brockSize - _newPos.x, 0 );
 		}
 		else if( _oldPos.y < _brockNew.y ){
 			// ブロックの上側が接触
-			_newPos.set( 0, _brockNew.y - _newPos.y - 0.1 );
+			_newPos.set( 0, _brockNew.y - _newPos.y );
 		}
 		else if( _oldPos.y >= _brockNew.y + _brockSize ){
 			// ブロックの下側が接触
-			_newPos.set( 0, _brockNew.y + _brockSize - _newPos.y + 0.1 );
+			_newPos.set( 0, _brockNew.y + _brockSize - _newPos.y );
+		}
+	}
+
+	private function CheckHitWall_Irregular( _mapchip : Int, _oldPos : FlxPoint, _newPos : FlxPoint, _brock : FlxPoint, _brockNew : FlxPoint ) : Bool
+	{
+		// チェックフラグ。最初の項目にHitしなかったら、そのまま処理が通る
+		var _fgCheck	: Bool 		= true;
+		var _dif 		: FlxPoint	= new FlxPoint( _newPos.x - _oldPos.x, _newPos.y - _oldPos.y );
+		var _brockSize 	: Float		= GameCommon.ResSize;
+		
+		// 特殊な判定が必要かどうか。　必要な場合はチェックフラグを下げて、細かい判定を行なう。
+		switch( _mapchip ){
+			// マップチップが左上で、前回位置も左上の場合
+			case GameCommon.MapChip_LT:		if ( _oldPos.x <  _brock.x + _brockSize	&& _oldPos.y < _brock.y + _brockSize )	_fgCheck = false;
+			// マップチップが右上で、前回位置も右上の場合
+			case GameCommon.MapChip_RT:		if( _oldPos.x >= _brock.x				&& _oldPos.y < _brock.y + _brockSize )	_fgCheck = false;
+			// マップチップが左下で、前回位置も左下の場合
+			case GameCommon.MapChip_LB:		if( _oldPos.x <= _brock.x + _brockSize	&& _oldPos.y > _brock.y )				_fgCheck = false;
+			// マップチップが右下で、前回位置も右下の場合
+			case GameCommon.MapChip_RB:		if( _oldPos.x >  _brock.x 				&& _oldPos.y > _brock.y )				_fgCheck = false;
+			// その他、ここにはこないはず
+			default:	trace( "WrongMapchip" );
 		}
 
-		trace( "newNewpos:" + _newPos.x, _newPos.y );
-		trace( " " );
+		// 検査に引っかかったら、再検査に行かないとダメなんですよ。
+		if ( !_fgCheck ){
+			_fgCheck = CheckHitWall_Irregular_Dir( _mapchip, _oldPos, _newPos, _brock, _brockNew );
+		}
+		
+		return _fgCheck;
+	}
 
+	private function CheckHitWall_Irregular_Dir( _mapchip : Int, _oldPos : FlxPoint, _newPos : FlxPoint, _brock : FlxPoint, _brockNew : FlxPoint ) : Bool
+	{
+		// 前回と今回の移動差
+		var _dif		: FlxPoint	= new FlxPoint( _newPos.x - _oldPos.x, _newPos.y - _oldPos.y );
+		var _brockOfs	: FlxPoint	= new FlxPoint( _newPos.x - _brock.x, _newPos.y - _brock.y );
+		var _brockSize 	: Float		= GameCommon.ResSize;
+		var _fgCheck	: Bool		= false;
+		var _fgCheckX	: Bool 		= ( _dif.x * _dif.x < _dif.y * _dif.y );
+		
 		switch( _mapchip ){
-			// 左上の場合
-			case AssetPaths.GameCommon.MapChip_LT:
+			case GameCommon.MapChip_LT:
+				// 移動の少ないほうを採用して、ブロックの場所を求める。
+				if ( _fgCheckX )	_brockNew.set( _brock.x, _brock.y + ( _brockSize - _brockOfs.x ) );
+				else				_brockNew.set( _brock.x + ( _brockSize - _brockOfs.y ), _brock.y );
+				
+				// 変更後の状態で当たっているならば
+				if( _newPos.x >= _brockNew.x &&
+					_newPos.y >= _brockNew.y )
+				{
+					_fgCheck = true;
+				}
+
+			case GameCommon.MapChip_RT:
+				// 移動の少ないほうを採用して、ブロックの場所を求める。
+				if ( _fgCheckX )	_brockNew.set( _brock.x, _brock.y + _brockOfs.x );
+				else				_brockNew.set( _brock.x - ( _brockSize - _brockOfs.y ), _brock.y );
+				
+				// 変更後の状態で当たっているならば
+				if( _newPos.x <= _brockNew.x + _brockSize &&
+					_newPos.y >= _brockNew.y )
+				{
+					_fgCheck = true;
+				}
+				
+			case GameCommon.MapChip_LB:
+				// 移動の少ないほうを採用して、ブロックの場所を求める。
+				if ( _fgCheckX )	_brockNew.set( _brock.x, _brock.y - ( _brockSize - _brockOfs.x ) );
+				else				_brockNew.set( _brock.x + _brockOfs.y, _brock.y );
+				
+				// 変更後の状態で当たっているならば
+				if( _newPos.x >= _brockNew.x &&
+					_newPos.y <= _brockNew.y + _brockSize )
+				{
+					_fgCheck = true;
+				}
+				
+			case GameCommon.MapChip_RB:
+				// 移動の少ないほうを採用して、ブロックの場所を求める。
+				if ( _fgCheckX )	_brockNew.set( _brock.x, _brock.y - _brockOfs.x );
+				else				_brockNew.set( _brock.x - _brockOfs.y, _brock.y );
+
+				// 変更後の状態で当たっているならば
+				if( _newPos.x <= _brockNew.x + _brockSize &&
+					_newPos.y <= _brockNew.y + _brockSize )
+				{
+					_fgCheck = true;
+				}
+				
+			default: /*何もしない*/
+		}
+		
+		return _fgCheck;
+	}	
+
+	private function CheckHitWall_SetNextDir( _mapChip : Int )
+	{
+		switch( _mapChip ){
+			// 左上側の場合
+			case GameCommon.MapChip_LT:
+				// 方向制御
 				switch( m_dir ){
 					case UP:	m_nextDir = DOWN;
 					case DOWN:	m_nextDir = LEFT;
@@ -1004,8 +642,9 @@ class Refline extends FlxSprite
 					case RIGHT:	m_nextDir = UP;
 				}
 				
-			// 右上の場合
-			case AssetPaths.GameCommon.MapChip_RT:
+			// 右上側の場合
+			case GameCommon.MapChip_RT:
+				// 方向制御
 				switch( m_dir ){
 					case UP:	m_nextDir = DOWN;
 					case DOWN:	m_nextDir = RIGHT;
@@ -1013,8 +652,9 @@ class Refline extends FlxSprite
 					case RIGHT:	m_nextDir = LEFT;
 				}
 				
-			// 左下の場合
-			case AssetPaths.GameCommon.MapChip_LB:
+			// 左下側の場合
+			case GameCommon.MapChip_LB:
+				// 方向制御
 				switch( m_dir ){
 					case UP:	m_nextDir = LEFT;
 					case DOWN:	m_nextDir = UP;
@@ -1022,8 +662,9 @@ class Refline extends FlxSprite
 					case RIGHT:	m_nextDir = DOWN;
 				}
 				
-			// 右下の場合
-			case AssetPaths.GameCommon.MapChip_RB:
+			// 右下側の場合
+			case GameCommon.MapChip_RB:
+				// 方向制御
 				switch( m_dir ){
 					case UP:	m_nextDir = RIGHT;
 					case DOWN:	m_nextDir = UP;
@@ -1031,149 +672,14 @@ class Refline extends FlxSprite
 					case RIGHT:	m_nextDir = LEFT;
 				}
 				
-		}
-		
-		return true;
-	}
-
-	private function CheckHitWall_Irregular_Dir( _mapchip : Int, _oldPos : FlxPoint, _newPos : FlxPoint, _brock : FlxPoint, _brockNew : FlxPoint )
-	{
-		var _brockSize 	: Float		= GameCommon.ResSize;
-		var _dif 		: FlxPoint = new FlxPoint( _newPos.x - _oldPos.x, _newPos.y - _oldPos.y );
-		var _fgCheck 	: Bool = false;
-		var _brockOfsX	: Float = _newPos.x - _brock.x;
-		var _brockOfsY	: Float = _newPos.y - _brock.y;
-
-		switch( _mapchip ){
-			// 左上の場合
-			case AssetPaths.GameCommon.MapChip_LT:
-				if ( _oldPos.x < _brock.x + _brockSize &&
-					 _oldPos.y < _brock.y + _brockSize )
-				{
-					_fgCheck = true;
-				}
-				
-			// 右上の場合
-			case AssetPaths.GameCommon.MapChip_RT:
-				if ( _oldPos.x >= _brock.x &&
-					 _oldPos.y < _brock.y + _brockSize )
-				{
-					_fgCheck = true;
-				}
-				
-			// 左下の場合
-			case AssetPaths.GameCommon.MapChip_LB:
-				if ( _oldPos.x < _brock.x + _brockSize &&
-					 _oldPos.y >= _brock.y )
-				{
-					_fgCheck = true;
-				}
-				
-			// 右下の場合
-			case AssetPaths.GameCommon.MapChip_RB:
-				if ( _oldPos.x >= _brock.x &&
-					 _oldPos.y >= _brock.y )
-				{
-					_fgCheck = true;
+			default:
+				// 方向制御
+				switch( m_dir ){
+					case UP:	m_nextDir = DOWN;
+					case DOWN:	m_nextDir = UP;
+					case LEFT:	m_nextDir = RIGHT;
+					case RIGHT:	m_nextDir = LEFT;
 				}
 		}
-		
-		// 一時チェック
-		if( !_fgCheck ){
-			return false;
-		}
-		
-		var _dif : FlxPoint = new FlxPoint( _newPos.x - _oldPos.x, _newPos.y - _oldPos.y );
-		
-		// 移動の少ないほうを採用して、ブロックの場所を求める。
-		// ｘのほうが短いので、ｘを元にｙを算出
-		if( _dif.x * _dif.x < _dif.y * _dif.y ){
-			var _brockOfs : Float = _newPos.x - _brock.x;
-			switch( _mapchip ){
-				// 左上の場合
-				case AssetPaths.GameCommon.MapChip_LT:		_brockNew.set( _newPos.x, _brock.y + ( _brockSize - _brockOfs ) );
-				// 右上の場合
-				case AssetPaths.GameCommon.MapChip_RT:		_brockNew.set( _newPos.x - _brockSize, _brock.y + _brockOfs );
-				// 左下の場合
-				case AssetPaths.GameCommon.MapChip_LB:		_brockNew.set( _newPos.x, _brock.y + ( _brockOfs ) );
-				// 右下の場合
-				case AssetPaths.GameCommon.MapChip_RB:		_brockNew.set( _newPos.x, _brock.y + ( _brockSize - _brockOfs ) );
-			}
-		}
-		// ｙのほうが短いので、ｙを元にｘを算出
-		else{
-			var _brockOfs : Float = _newPos.y - _brock.y;
-			switch( _mapchip ){
-				// 左上の場合
-				case AssetPaths.GameCommon.MapChip_LT:		_brockNew.set( _brock.x + ( _brockSize - _brockOfs ), _newPos.y );
-				// 右上の場合
-				case AssetPaths.GameCommon.MapChip_RT:		_brockNew.set( _brock.x - ( _brockSize - _brockOfs ), _newPos.y );
-				// 左下の場合
-				case AssetPaths.GameCommon.MapChip_LB:		_brockNew.set( _brock.x + ( _brockOfs )				, _newPos.y );
-				// 右下の場合
-				case AssetPaths.GameCommon.MapChip_RB:		_brockNew.set( _brock.x + ( _brockSize - _brockOfs ), _newPos.y );
-					
-			}
-		}
-		
-		_fgCheck = false;
-		
-		// 最終チェック
-		switch( _mapchip ){
-			// 左上の場合
-			case AssetPaths.GameCommon.MapChip_LT:
-				if( _newPos.x >= _brockNew.x &&
-					_newPos.y >= _brockNew.y )
-				{
-					_fgCheck = true;
-				}
-			// 右上の場合
-			case AssetPaths.GameCommon.MapChip_RT:
-				// 変更後の状態で当たっているならば
-				if( _newPos.x <= _brockNew.x + _brockSize &&
-					_newPos.y >= _brockNew.y )
-				{
-					_fgCheck = true;
-				}
-			// 左下の場合
-			case AssetPaths.GameCommon.MapChip_LB:
-				if( _newPos.x >= _brockNew.x &&
-					_newPos.y >= _brockNew.y )
-				{
-					_fgCheck = true;
-				}
-			// 右下の場合
-			case AssetPaths.GameCommon.MapChip_RB:
-				if( _newPos.x >= _brockNew.x &&
-					_newPos.y >= _brockNew.y )
-				{
-					_fgCheck = true;
-				}
-				
-		}
-		// 変更後の状態で当たっているならば
-		if( _fgCheck )
-		{
-/*			trace("Check2");
-			trace( "brock:" + _brock.x, _brock.y );
-			trace( "brockNew:" + _brockNew.x, _brockNew.y );
-			trace( "oldpos:" + _oldPos.x, _oldPos.y );
-			trace( "newpos:" + _newPos.x, _newPos.y );
-*/
-		}
-		else{
-/*			trace("Check1");
-			trace( "brock:" + _brock.x, _brock.y );
-			trace( "brockNew:" + _brockNew.x, _brockNew.y );
-			trace( "oldpos:" + _oldPos.x, _oldPos.y );
-			trace( "newpos:" + _newPos.x, _newPos.y );
-			trace( " " );
-*/
-			// 当たっていなければ、処理をやめる
-			_newPos.set( 0, 0 );
-			return false;
-		}
-		
-		return true;
 	}
 }

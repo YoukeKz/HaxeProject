@@ -29,16 +29,25 @@ class GameState extends FlxState
 
 		// マップのロード
 		m_map = new FlxTilemap();
-		m_map.loadMapFromCSV( AssetPaths.DATA_MAPDATA, AssetPaths.IMAGE_RES, AssetPaths.GameCommon.ResSize, AssetPaths.GameCommon.ResSize, FlxTilemapAutoTiling.OFF );
+		m_map.loadMapFromCSV( AssetPaths.DATA_MAPDATA, AssetPaths.IMAGE_RES, AssetPaths.GameCommon.ResSize, AssetPaths.GameCommon.ResSize, FlxTilemapAutoTiling.OFF, 0, 0 );
 		add( m_map );
 
 		add( Refline.CreateGroup() );
 		add( Player.CreateInstance( 100, 100 ) );
 		
 		FlxG.debugger.toggleKeys = ["ALT"];
-
 	}
-
+	
+	/*!
+		@brief	
+		@date	2016/3/29
+	*/
+	override public function destroy()
+	{
+		Refline.DestroyGroup();
+		super.destroy();
+	}
+	
 	override public function update(elapsed:Float):Void
 	{
 		super.update(elapsed);
