@@ -55,7 +55,7 @@ class GameState extends FlxState
 		Refline.DbgPrint();
 		
 		// 次のステートへ移る
-		if ( FlxG.keys.justPressed.ENTER ){
+		if ( FlxG.keys.justPressed.R ){
 			FlxG.switchState( new GameState() );
 			m_cnt ++;
 		}

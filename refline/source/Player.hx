@@ -33,6 +33,7 @@ class Player extends FlxSprite
 	private var m_size		: FlxPoint;
 	private var m_dirImg	: Direction;
 	
+	private var m_collHosei	: FlxPoint;
 	private var m_fgHitWall	: Bool;
 	
 	//*************************/
@@ -83,6 +84,7 @@ class Player extends FlxSprite
 		m_pos		= new FlxPoint();
 		m_addPos	= new FlxPoint();
 		m_size		= new FlxPoint();
+		m_collHosei	= new FlxPoint();
 		m_dirImg	= new Direction();
 		m_dirImg.init();
 		s_parent.add( m_dirImg );
@@ -129,9 +131,17 @@ class Player extends FlxSprite
 			trace( "SPACE" );
 		}
 		
-		m_pos.add( m_addPos.x, m_addPos.y );
-		m_addPos.set();
-		setPosition( m_pos.x, m_pos.y );
+		CheckHitWall();
+		
+		// ポジションの更新
+		{
+			m_pos.addPoint( m_addPos );
+			m_pos.addPoint( m_collHosei );
+			m_addPos.set();
+			m_collHosei.set();
+			
+			setPosition( m_pos.x, m_pos.y );
+		}
 		
 		m_dirImg.SetLocation( x, y, m_dir );
 	}
@@ -148,7 +158,7 @@ class Player extends FlxSprite
 		@brief	壁との判定関数、大元
 		@date	2016/3/24
 	*/
-/*	private function CheckHitWall()
+	private function CheckHitWall()
 	{
 		var _mapPosX 	: Int 			= Std.int( x / AssetPaths.GameCommon.ResSize );
 		var _mapPosY 	: Int 			= Std.int( y / AssetPaths.GameCommon.ResSize );
@@ -197,22 +207,58 @@ class Player extends FlxSprite
 		@brief	判定の種類を細かい区分に分ける
 		@date	2016/3/24
 	*/
-/*	private function CheckHitWall_Main( _mapchip : Int, _x : Int, _y : Int )
+	private function CheckHitWall_Main( _mapchip : Int, _x : Int, _y : Int )
 	{
-		var _fgHitWall : Bool = false;
-		var _newPos : FlxPoint;
+		var _fgHitWallX	: Bool		= false;
+		var _fgHitWallY	: Bool		= false;
 
-		// １フレ後に向かうポジション
-		_newPos = new FlxPoint( x + m_addPos.x + m_addHead.x,  y + m_addPos.y + m_addHead.y );
+		var _newPos		: FlxPoint	= new FlxPoint();
+		var _collHosei	: FlxPoint	= new FlxPoint( m_collHosei.x, m_collHosei.y );
 		
-		// 当たっているかを調べる。_newPosには補正値が返ってくる。
-		_fgHitWall = CheckHitWall_Normal( _mapchip, _x, _y, _newPos );
+		// X軸の移動
+		{
+			// １フレ後に向かうポジション
+			_newPos.set( x + _collHosei.x + m_addPos.x, y + _collHosei.y );
+			
+			// 当たっているかを調べる。_newPosには補正値が返ってくる。
+			_fgHitWallX = CheckHitWall_CheckHit( _mapchip, _x, _y, _newPos, true );
 
-		// 移動値を変更する
-		if( _fgHitWall ){
-			if( m_fgLenMax )	m_addPos.addPoint( _newPos );
-			else				m_addHead.addPoint( _newPos );
+			_collHosei.x += _newPos.x;
+			_collHosei.y += _newPos.y;
+		}
+		
+		{
+			// １フレ後に向かうポジション
+			_newPos.set( x + _collHosei.x + m_addPos.x, y + _collHosei.y + m_addPos.y );
+			
+			// 当たっているかを調べる。_newPosには補正値が返ってくる。
+			_fgHitWallY = CheckHitWall_CheckHit( _mapchip, _x, _y, _newPos, false );
+		}
+
+		if( _fgHitWallX || _fgHitWallY ){
 			m_fgHitWall = true;
+			
+			_collHosei.set( m_collHosei.x, m_collHosei.y );
+			
+			// X軸の移動
+			{
+				_newPos.set( x + m_collHosei.x + m_addPos.x, y + m_collHosei.y );
+				
+				// 当たっているかを調べる。_newPosには補正値が返ってくる。
+				_fgHitWallX = CheckHitWall_CheckHit( _mapchip, _x, _y, _newPos, true );
+			}
+			
+			// Y軸の移動
+			{
+				// １フレ後に向かうポジション
+				_newPos.set( x + m_collHosei.x + m_addPos.x, y + m_collHosei.y + m_addPos.y );
+				
+				// 当たっているかを調べる。_newPosには補正値が返ってくる。
+				_fgHitWallY = CheckHitWall_CheckHit( _mapchip, _x, _y, _newPos, false );
+			}
+
+			m_collHosei.x += _newPos.x;
+			m_collHosei.y += _newPos.y;
 		}
 	}
 	
@@ -220,45 +266,73 @@ class Player extends FlxSprite
 		@brief	通常の壁と当たった場合
 		@date	2016/3/24
 	*/
-/*	private function CheckHitWall_Normal( _mapchip : Int, _x : Int, _y : Int, _newPos : FlxPoint ) : Bool
+	private function CheckHitWall_CheckHit( _mapchip : Int, _x : Int, _y : Int, _newPos : FlxPoint, _fgX : Bool ) : Bool
 	{
-		if( _mapchip <= GameCommon.MapChip_None ||
-			_mapchip >= GameCommon.MapChip_Max )
+		var _brockSize 	: Float		= AssetPaths.GameCommon.ResSize;
+
+		if( _mapchip <= AssetPaths.GameCommon.MapChip_None ||
+			_mapchip >= AssetPaths.GameCommon.MapChip_Max )
 		{
 			return false;
 		}
 		
-		var _brockSize 	: Float		= GameCommon.ResSize;
 		var _oldPos		: FlxPoint	= new FlxPoint( x, y );
 		var _brock		: FlxPoint 	= new FlxPoint( _x * _brockSize, _y * _brockSize );
 		var _brockNew	: FlxPoint 	= new FlxPoint( _brock.x, _brock.y );
 		var _fgHitIrregular : Bool	= false;
+		var _sizeX		: Float		= m_size.x / 2;
+		var _sizeY		: Float		= m_size.y / 2;
 		
 		// 当たっているかどうか。
 		{
-			var _mapPosNewX	: Int = Std.int( _oldPos.x / GameCommon.ResSize );
-			var _mapPosNewY	: Int = Std.int( _oldPos.y / GameCommon.ResSize );
-			var _mapPosOldX	: Int = Std.int( _newPos.x / GameCommon.ResSize );
-			var _mapPosOldY	: Int = Std.int( _newPos.y / GameCommon.ResSize );
+			var _fgHitX : Bool = false;
+			var _fgHitY : Bool = false;
 			
-			// 現在位置、未来位置がそのマスに属しているか。
-			if ( ( _mapPosOldX != _x || _mapPosOldY != _y ) && 
-				 ( _mapPosNewX != _x || _mapPosNewY != _y ) )
+			// 現在位置Xがそのマスにめり込んでいるかどうか。
+			if( _oldPos.x + _sizeX >= _brockNew.x &&
+				_oldPos.x - _sizeX < _brockNew.x + _brockSize )
 			{
+				_fgHitX = true;
+			}
+			// 未来位置Xがそのマスにめり込んでいるかどうか。
+			else if( _newPos.x + _sizeX >= _brockNew.x &&
+					 _newPos.x - _sizeX < _brockNew.x + _brockSize )
+			{
+				_fgHitX = true;
+			}
+			
+			// 現在位置Yがそのマスにめり込んでいるかどうか。
+			if( _oldPos.y + _sizeY >= _brockNew.y &&
+				_oldPos.y - _sizeY < _brockNew.y + _brockSize )
+			{
+				_fgHitY = true;
+			}
+			// 未来位置Yがそのマスにめり込んでいるかどうか。
+			else if( _newPos.y + _sizeY >= _brockNew.y &&
+					 _newPos.y - _sizeY < _brockNew.y + _brockSize )
+			{
+				_fgHitY = true;
+			}
+			
+			if( _fgHitX && _fgHitY ){
+				
+			}
+			else{
 				// 当たっていないので、処理をやめる
 				_newPos.set( 0, 0 );
 				return false;
 			}
-			else if ( _mapchip != GameCommon.MapChip_Normal ){
-				if ( !CheckHitWall_Irregular( _mapchip, _oldPos, _newPos, _brock, _brockNew ) ){
-					_newPos.set( 0, 0 );
-					return false;
-				}
-			}
 		}
 
-		// 補正値を算出
-		CheckHitWall_GetHosei( _oldPos, _newPos, _brockNew );
+		if( _fgX ){
+			// 補正値を算出
+			CheckHitWall_GetHoseiX( _oldPos, _newPos, _brockNew );
+			
+		}
+		else{
+			// 補正値を算出
+			CheckHitWall_GetHoseiY( _oldPos, _newPos, _brockNew );
+		}
 		
 		// 方向制御
 		CheckHitWall_SetNextDir( _mapchip );
@@ -266,26 +340,35 @@ class Player extends FlxSprite
 		return true;
 	}
 
-	private function CheckHitWall_GetHosei( _oldPos : FlxPoint, _newPos : FlxPoint, _brockNew : FlxPoint ) 
+	private function CheckHitWall_GetHoseiX( _oldPos : FlxPoint, _newPos : FlxPoint, _brockNew : FlxPoint ) 
 	{
-		var _brockSize 	: Float		= GameCommon.ResSize;
+		var _brockSize 	: Float		= AssetPaths.GameCommon.ResSize;
+		var _sizeX		: Float		= m_size.x / 2;
+		var _sizeY		: Float		= m_size.y / 2;
 		
 		// 補正値を算出
-		if ( _oldPos.x < _brockNew.x ){
+		if ( _oldPos.x + _sizeX > _brockNew.x ){
 			// ブロックの左側が接触
-			_newPos.set( _brockNew.x - _newPos.x, 0 ); 
+			_newPos.set( _brockNew.x - _newPos.x - _sizeX, 0 ); 
 		}
-		else if( _oldPos.x >= _brockNew.x + _brockSize ){
+		else if( _oldPos.x - _sizeX >= _brockNew.x + _brockSize ){
 			// ブロックの右側が接触
-			_newPos.set( _brockNew.x + _brockSize - _newPos.x, 0 );
+			_newPos.set( _brockNew.x + _brockSize - _newPos.x + _sizeX, 0 );
 		}
-		else if( _oldPos.y < _brockNew.y ){
+	}
+	private function CheckHitWall_GetHoseiY( _oldPos : FlxPoint, _newPos : FlxPoint, _brockNew : FlxPoint ) 
+	{
+		var _brockSize 	: Float		= AssetPaths.GameCommon.ResSize;
+		var _sizeX		: Float		= m_size.x / 2;
+		var _sizeY		: Float		= m_size.y / 2;
+		
+		if( _oldPos.y + _sizeY < _brockNew.y ){
 			// ブロックの上側が接触
-			_newPos.set( 0, _brockNew.y - _newPos.y );
+			_newPos.set( 0, _brockNew.y - _newPos.y - _sizeY );
 		}
-		else if( _oldPos.y >= _brockNew.y + _brockSize ){
+		else if( _oldPos.y - _sizeY >= _brockNew.y + _brockSize ){
 			// ブロックの下側が接触
-			_newPos.set( 0, _brockNew.y + _brockSize - _newPos.y );
+			_newPos.set( 0, _brockNew.y + _brockSize - _newPos.y + _sizeY );
 		}
 	}
 
@@ -294,18 +377,18 @@ class Player extends FlxSprite
 		// チェックフラグ。最初の項目にHitしなかったら、そのまま処理が通る
 		var _fgCheck	: Bool 		= true;
 		var _dif 		: FlxPoint	= new FlxPoint( _newPos.x - _oldPos.x, _newPos.y - _oldPos.y );
-		var _brockSize 	: Float		= GameCommon.ResSize;
+		var _brockSize 	: Float		= AssetPaths.GameCommon.ResSize;
 		
 		// 特殊な判定が必要かどうか。　必要な場合はチェックフラグを下げて、細かい判定を行なう。
 		switch( _mapchip ){
 			// マップチップが左上で、前回位置も左上の場合
-			case GameCommon.MapChip_LT:		if ( _oldPos.x <  _brock.x + _brockSize	&& _oldPos.y < _brock.y + _brockSize )	_fgCheck = false;
+			case AssetPaths.GameCommon.MapChip_LT:		if ( _oldPos.x <  _brock.x + _brockSize	&& _oldPos.y < _brock.y + _brockSize )	_fgCheck = false;
 			// マップチップが右上で、前回位置も右上の場合
-			case GameCommon.MapChip_RT:		if( _oldPos.x >= _brock.x				&& _oldPos.y < _brock.y + _brockSize )	_fgCheck = false;
+			case AssetPaths.GameCommon.MapChip_RT:		if( _oldPos.x >= _brock.x				&& _oldPos.y < _brock.y + _brockSize )	_fgCheck = false;
 			// マップチップが左下で、前回位置も左下の場合
-			case GameCommon.MapChip_LB:		if( _oldPos.x <= _brock.x + _brockSize	&& _oldPos.y > _brock.y )				_fgCheck = false;
+			case AssetPaths.GameCommon.MapChip_LB:		if( _oldPos.x <= _brock.x + _brockSize	&& _oldPos.y > _brock.y )				_fgCheck = false;
 			// マップチップが右下で、前回位置も右下の場合
-			case GameCommon.MapChip_RB:		if( _oldPos.x >  _brock.x 				&& _oldPos.y > _brock.y )				_fgCheck = false;
+			case AssetPaths.GameCommon.MapChip_RB:		if( _oldPos.x >  _brock.x 				&& _oldPos.y > _brock.y )				_fgCheck = false;
 			// その他、ここにはこないはず
 			default:	trace( "WrongMapchip" );
 		}
@@ -323,12 +406,12 @@ class Player extends FlxSprite
 		// 前回と今回の移動差
 		var _dif		: FlxPoint	= new FlxPoint( _newPos.x - _oldPos.x, _newPos.y - _oldPos.y );
 		var _brockOfs	: FlxPoint	= new FlxPoint( _newPos.x - _brock.x, _newPos.y - _brock.y );
-		var _brockSize 	: Float		= GameCommon.ResSize;
+		var _brockSize 	: Float		= AssetPaths.GameCommon.ResSize;
 		var _fgCheck	: Bool		= false;
 		var _fgCheckX	: Bool 		= ( _dif.x * _dif.x < _dif.y * _dif.y );
 		
 		switch( _mapchip ){
-			case GameCommon.MapChip_LT:
+			case AssetPaths.GameCommon.MapChip_LT:
 				// 移動の少ないほうを採用して、ブロックの場所を求める。
 				if ( _fgCheckX )	_brockNew.set( _brock.x, _brock.y + ( _brockSize - _brockOfs.x ) );
 				else				_brockNew.set( _brock.x + ( _brockSize - _brockOfs.y ), _brock.y );
@@ -340,7 +423,7 @@ class Player extends FlxSprite
 					_fgCheck = true;
 				}
 
-			case GameCommon.MapChip_RT:
+			case AssetPaths.GameCommon.MapChip_RT:
 				// 移動の少ないほうを採用して、ブロックの場所を求める。
 				if ( _fgCheckX )	_brockNew.set( _brock.x, _brock.y + _brockOfs.x );
 				else				_brockNew.set( _brock.x - ( _brockSize - _brockOfs.y ), _brock.y );
@@ -352,7 +435,7 @@ class Player extends FlxSprite
 					_fgCheck = true;
 				}
 				
-			case GameCommon.MapChip_LB:
+			case AssetPaths.GameCommon.MapChip_LB:
 				// 移動の少ないほうを採用して、ブロックの場所を求める。
 				if ( _fgCheckX )	_brockNew.set( _brock.x, _brock.y - ( _brockSize - _brockOfs.x ) );
 				else				_brockNew.set( _brock.x + _brockOfs.y, _brock.y );
@@ -364,7 +447,7 @@ class Player extends FlxSprite
 					_fgCheck = true;
 				}
 				
-			case GameCommon.MapChip_RB:
+			case AssetPaths.GameCommon.MapChip_RB:
 				// 移動の少ないほうを採用して、ブロックの場所を求める。
 				if ( _fgCheckX )	_brockNew.set( _brock.x, _brock.y - _brockOfs.x );
 				else				_brockNew.set( _brock.x - _brockOfs.y, _brock.y );
@@ -384,56 +467,5 @@ class Player extends FlxSprite
 
 	private function CheckHitWall_SetNextDir( _mapChip : Int )
 	{
-		switch( _mapChip ){
-			// 左上側の場合
-			case GameCommon.MapChip_LT:
-				// 方向制御
-				switch( m_dir ){
-					case UP:	m_nextDir = DOWN;
-					case DOWN:	m_nextDir = LEFT;
-					case LEFT:	m_nextDir = RIGHT;
-					case RIGHT:	m_nextDir = UP;
-				}
-				
-			// 右上側の場合
-			case GameCommon.MapChip_RT:
-				// 方向制御
-				switch( m_dir ){
-					case UP:	m_nextDir = DOWN;
-					case DOWN:	m_nextDir = RIGHT;
-					case LEFT:	m_nextDir = UP;
-					case RIGHT:	m_nextDir = LEFT;
-				}
-				
-			// 左下側の場合
-			case GameCommon.MapChip_LB:
-				// 方向制御
-				switch( m_dir ){
-					case UP:	m_nextDir = LEFT;
-					case DOWN:	m_nextDir = UP;
-					case LEFT:	m_nextDir = RIGHT;
-					case RIGHT:	m_nextDir = DOWN;
-				}
-				
-			// 右下側の場合
-			case GameCommon.MapChip_RB:
-				// 方向制御
-				switch( m_dir ){
-					case UP:	m_nextDir = RIGHT;
-					case DOWN:	m_nextDir = UP;
-					case LEFT:	m_nextDir = DOWN;
-					case RIGHT:	m_nextDir = LEFT;
-				}
-				
-			default:
-				// 方向制御
-				switch( m_dir ){
-					case UP:	m_nextDir = DOWN;
-					case DOWN:	m_nextDir = UP;
-					case LEFT:	m_nextDir = RIGHT;
-					case RIGHT:	m_nextDir = LEFT;
-				}
-		}
 	}
-*/
 }

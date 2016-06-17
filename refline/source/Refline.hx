@@ -29,7 +29,7 @@ class Refline extends FlxSprite
 	public 	static var s_group		: FlxTypedGroup< Refline > = null;
 	
 	// private
-	private static var s_lengthMax		: Int 	= 4;
+	private static var s_lengthMax		: Int 	= 16;
 	private	static var s_isCreategroup 	: Bool 	= false;
 	private static var s_objCnt			: Int	= 0;
 	private static var s_fgDbgPrint		: Bool	= false;
